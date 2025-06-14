@@ -18,6 +18,7 @@ class TestSmokeTests():
     options.add_argument("--headless=new")
     self.driver = webdriver.Chrome(options=options)
     self.vars = {}
+    self.driver.implicitly_wait(10)
   
   def teardown_method(self, method):
     self.driver.quit()
