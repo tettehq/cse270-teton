@@ -1,13 +1,9 @@
 import pytest
 import time
-import json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 
@@ -20,19 +16,58 @@ class TestSmokeTests():
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         self.driver = webdriver.Chrome(options=options)
-        self.vars = {}
-        self.wait = WebDriverWait(self.driver, 20)  # increased wait time
-        self.driver.implicitly_wait(5)  # shorter implicit wait; explicit preferred
+        self.wait = WebDriverWait(self.driver, 20)
+        self.driver.implicitly_wait(5)  # short implicit wait
 
     def teardown_method(self, method):
         self.driver.quit()
 
-    def wait_and_click(self, by, locator):
-        element = self.wait.until(EC.element_to_be_clickable((by, locator)))
-        element.click()
+    # ---------- Helpers with retry ----------
 
-    def wait_for_text(self, by, locator, text):
-        self.wait.until(EC.text_to_be_present_in_element((by, locator), text))
+    def wait_and_click(self, by, locator, retries=3):
+        for attempt in range(retries):
+            try:
+                element = self.wait.until(EC.element_to_be_clickable((by, locator)))
+                element.click()
+                return
+            except StaleElementReferenceException:
+                if attempt < retries - 1:
+                    time.sleep(1)
+                else:
+                    raise
+
+    def wait_for_element(self, by, locator, retries=3):
+        for attempt in range(retries):
+            try:
+                return self.wait.until(EC.presence_of_element_located((by, locator)))
+            except StaleElementReferenceException:
+                if attempt < retries - 1:
+                    time.sleep(1)
+                else:
+                    raise
+
+    def wait_for_elements(self, by, locator, retries=3):
+        for attempt in range(retries):
+            try:
+                return self.wait.until(EC.presence_of_all_elements_located((by, locator)))
+            except StaleElementReferenceException:
+                if attempt < retries - 1:
+                    time.sleep(1)
+                else:
+                    raise
+
+    def wait_for_text(self, by, locator, text, retries=3):
+        for attempt in range(retries):
+            try:
+                self.wait.until(EC.text_to_be_present_in_element((by, locator), text))
+                return
+            except StaleElementReferenceException:
+                if attempt < retries - 1:
+                    time.sleep(1)
+                else:
+                    raise
+
+    # ---------- Tests ----------
 
     def test_directorypage(self):
         self.driver.get("http://127.0.0.1:5500/teton/1.6/index.html")
@@ -41,16 +76,11 @@ class TestSmokeTests():
         self.wait_and_click(By.LINK_TEXT, "Directory")
         self.wait_and_click(By.ID, "directory-grid")
 
-        text_element = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".gold-member:nth-child(9) > p:nth-child(2)"))
-        )
+        text_element = self.wait_for_element(By.CSS_SELECTOR, ".gold-member:nth-child(9) > p:nth-child(2)")
         assert text_element.text == "Teton Turf and Tree"
 
         self.wait_and_click(By.ID, "directory-list")
-
-        text_element = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".gold-member:nth-child(9) > p:nth-child(2)"))
-        )
+        text_element = self.wait_for_element(By.CSS_SELECTOR, ".gold-member:nth-child(9) > p:nth-child(2)")
         assert text_element.text == "Teton Turf and Tree"
 
     def test_adminpage(self):
@@ -59,9 +89,7 @@ class TestSmokeTests():
 
         self.wait_and_click(By.LINK_TEXT, "Admin")
 
-        label_element = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".myinput:nth-child(2)"))
-        )
+        label_element = self.wait_for_element(By.CSS_SELECTOR, ".myinput:nth-child(2)")
         assert label_element.text == "Username:"
 
         self.wait_and_click(By.ID, "username")
@@ -75,19 +103,13 @@ class TestSmokeTests():
         self.driver.get("http://127.0.0.1:5500/teton/1.6/index.html")
         self.driver.set_window_size(1936, 1096)
 
-        elements1 = self.wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".spotlight1 > .centered-image"))
-        )
+        elements1 = self.wait_for_elements(By.CSS_SELECTOR, ".spotlight1 > .centered-image")
         assert len(elements1) > 0
 
-        elements2 = self.wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".spotlight2 > .centered-image"))
-        )
+        elements2 = self.wait_for_elements(By.CSS_SELECTOR, ".spotlight2 > .centered-image")
         assert len(elements2) > 0
 
-        join_us_links = self.wait.until(
-            EC.presence_of_all_elements_located((By.LINK_TEXT, "Join Us!"))
-        )
+        join_us_links = self.wait_for_elements(By.LINK_TEXT, "Join Us!")
         assert len(join_us_links) > 0
 
         self.wait_and_click(By.LINK_TEXT, "Join Us!")
@@ -96,19 +118,13 @@ class TestSmokeTests():
         self.driver.get("http://127.0.0.1:5500/teton/1.6/index.html")
         self.driver.set_window_size(1936, 1096)
 
-        logo_elements = self.wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".header-logo img"))
-        )
+        logo_elements = self.wait_for_elements(By.CSS_SELECTOR, ".header-logo img")
         assert len(logo_elements) > 0
 
-        h1 = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".header-title > h1"))
-        )
+        h1 = self.wait_for_element(By.CSS_SELECTOR, ".header-title > h1")
         assert h1.text == "Teton Idaho"
 
-        h2 = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".header-title > h2"))
-        )
+        h2 = self.wait_for_element(By.CSS_SELECTOR, ".header-title > h2")
         assert h2.text == "Chamber of Commerce"
 
         assert self.driver.title == "Teton Idaho CoC"
@@ -119,9 +135,7 @@ class TestSmokeTests():
 
         self.wait_and_click(By.LINK_TEXT, "Join")
 
-        label = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".myinput:nth-child(2)"))
-        )
+        label = self.wait_for_element(By.CSS_SELECTOR, ".myinput:nth-child(2)")
         assert label.text == "First Name"
 
         self.wait_and_click(By.NAME, "fname")
@@ -131,7 +145,5 @@ class TestSmokeTests():
         self.driver.find_element(By.NAME, "biztitle").send_keys("Manager")
         self.driver.find_element(By.NAME, "submit").click()
 
-        email_label = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".myinput:nth-child(2)"))
-        )
+        email_label = self.wait_for_element(By.CSS_SELECTOR, ".myinput:nth-child(2)")
         assert email_label.text == "Email"
