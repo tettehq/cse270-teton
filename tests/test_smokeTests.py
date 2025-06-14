@@ -16,6 +16,8 @@ class TestSmokeTests():
   def setup_method(self, method):
     options = Options()
     options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
     self.driver = webdriver.Chrome(options=options)
     self.vars = {}
     self.driver.implicitly_wait(10)
